@@ -98,7 +98,6 @@ cmd_list[cmd_cnt]="ffmpeg -hide_banner -loglevel panic -stats -f concat -i $ffmp
 # now do any individual video modifications and join
 echo "++++++++++++++++++++"
 echo "Preparing video operations (have patience...)"
-
 for cmd in "${cmd_list[@]}"
 do
     $cmd
@@ -109,8 +108,10 @@ for file in ${tmp_file_set[*]}
 do
     rm $file
 done
+rm -f $ffmpeg_file_list
 
 endtime=`date +%s`
 runtime=$((endtime-starttime))
 echo "COMPLETE! Written ${file_out} in ${runtime} s"
+echo "+++++++++++++++++++++++++++++++++++++++++++++"
 
