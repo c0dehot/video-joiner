@@ -57,7 +57,7 @@ while [ $file_idx -le $total_files ]; do
       exit
    fi;
 
-   read -e -r -p "   .. info: ${resolution}, ${file_ext}, duration: ${duration_time} -- start at (default 00:00:00): " file_start_time
+   read -e -r -p "   .. info: ${resolution}, ${video_codec}/${file_ext}, duration: ${duration_time} -- start at (default 00:00:00): " file_start_time
    if [ ! "${#file_start_time}" -eq 0 ] && [ ! "${#file_start_time}" -eq 8 ]; then
       echo "ERROR: Invalid start-time (${file_start_time}) not in HH:MM:SS format."
       exit
