@@ -5,7 +5,7 @@
 # Use as you wish, all risk is yours.
 # Compatible with unix based systems (Mac, Ubuntu, Debian, etc.)
 #
-# Usage: ./video-joiner.sh [output.mp4]
+# Usage: ./video-joiner.sh [output.mp4] [src-dir]
 # It will prompt for the files to append together
 
 file_out=$1
@@ -43,11 +43,14 @@ fi
 cmd_cnt=0
 file_idx=1
 while [ $file_idx -le $total_files ]; do
-   echo "..........................."
-   
+   echo "............................................."
+
    read -e -r -p "$file_idx: Enter the video file: " filename
    file_ext=`echo "${filename##*.}" | tr '[:upper:]' '[:lower:]'`
-   resolution=`ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 ${filename}`
+   video_info=`ffprobe -v error -select_streams v:0 -show_entries stream=width,height,codec_name -of csv=s=x:p=0 ${filename}`
+   video_info=(${video_info//x/ })
+   video_codec="${video_info[0]}"
+   resolution="${video_info[1]}x${video_info[2]}"
    duration_time=`ffprobe ${filename} 2>&1 | grep -E '^ +Duration' | cut -d':' -f2- | cut -d, -f1- | cut -d'.' -f1`
    if [ -z $duration_time ]; then
       echo "ERROR: Sorry ${filename} an invalid video file. Quitting."
@@ -67,7 +70,7 @@ while [ $file_idx -le $total_files ]; do
    fi
 
    # build temp file using extracted portion of video (or codec change)
-   if [ "${#file_start_time}" -eq 0 ] && [ "${#file_end_time}" -eq 0 ] && [ $file_ext="mp4" ]; then
+   if [ "${#file_start_time}" -eq 0 ] && [ "${#file_end_time}" -eq 0 ] && [ $file_ext = "mp4" ] && [ $video_codec = "h264" ]; then
       echo "file ${filename}" >> $ffmpeg_file_list
    else
       cmd="ffmpeg -hide_banner -loglevel panic -stats "
@@ -78,8 +81,13 @@ while [ $file_idx -le $total_files ]; do
       if [ "${#file_end_time}" -eq 8 ]; then
          cmd+="-to ${file_end_time} "
       fi
-      if [ $file_ext="mp4" ]; then
+
+      if [ $file_ext = "mp4" ] && [ $video_codec = "h264" ]; then
          cmd+="-c copy "
+      elif [ $video_codec = "h264" ]; then
+         # since it's mkv or another container, but valid
+         # mp4 code, let's KEEP the codec.
+         cmd+="-vcodec copy "
       fi   
       tmp_filename=$filename`date +"%s"`".tmp.mp4"
       cmd+="${tmp_filename}"
@@ -112,6 +120,7 @@ rm -f $ffmpeg_file_list
 
 endtime=`date +%s`
 runtime=$((endtime-starttime))
+echo "+++++++++++++++++++++++++++++++++++++++++++++"
 echo "COMPLETE! Written ${file_out} in ${runtime} s"
 echo "+++++++++++++++++++++++++++++++++++++++++++++"
-
+echo 
