@@ -42,6 +42,7 @@ fi
 
 cmd_cnt=0
 file_idx=1
+video_resize=""
 while [ $file_idx -le $total_files ]; do
    echo "............................................."
 
@@ -57,6 +58,17 @@ while [ $file_idx -le $total_files ]; do
       exit
    fi;
 
+   # only ask on first file
+   if [ "${file_idx}" -eq 1 ]; then
+      read -e -r -p "   .. Resize output file? (currently ${resolution}): " video_resize
+      if [ "${#video_resize}" -eq 0 ]; then
+         video_resize="${resolution}"      
+      elif [ ! "${#video_resize}" -gt 5 ]; then
+         echo "ERROR: Invalid resizing resolution (${video_resize}): ex. 1920x1080, 1280x720, 640x480, ..."
+         exit
+      fi
+   fi
+
    read -e -r -p "   .. info: ${resolution}, ${video_codec}/${file_ext}, duration: ${duration_time} -- start at (default 00:00:00): " file_start_time
    if [ ! "${#file_start_time}" -eq 0 ] && [ ! "${#file_start_time}" -eq 8 ]; then
       echo "ERROR: Invalid start-time (${file_start_time}) not in HH:MM:SS format."
@@ -70,7 +82,7 @@ while [ $file_idx -le $total_files ]; do
    fi
 
    # build temp file using extracted portion of video (or codec change)
-   if [ "${#file_start_time}" -eq 0 ] && [ "${#file_end_time}" -eq 0 ] && [ $file_ext = "mp4" ] && [ $video_codec = "h264" ]; then
+   if [ "${#file_start_time}" -eq 0 ] && [ "${#file_end_time}" -eq 0 ] && [ $file_ext = "mp4" ] && [ $video_codec = "h264" ] && [ $video_resize = $resolution ]; then
       echo "file ${filename}" >> $ffmpeg_file_list
    else
       cmd="ffmpeg -hide_banner -loglevel panic -stats "
@@ -82,11 +94,13 @@ while [ $file_idx -le $total_files ]; do
          cmd+="-to ${file_end_time} "
       fi
 
-      if [ $file_ext = "mp4" ] && [ $video_codec = "h264" ]; then
+      if [ $file_ext = "mp4" ] && [ $video_codec = "h264" ] && [ $video_resize = $resolution ]; then
          cmd+="-c copy "
+      elif [ ! $video_resize = $resolution ]; then
+         # if resampling, make it smaller (3M bit-rate hardcoded, index@start)
+         cmd+="-s ${video_resize} -c:v libx264 -b:v 3M -strict -2 -movflags faststart "
       elif [ $video_codec = "h264" ]; then
-         # since it's mkv or another container, but valid
-         # mp4 code, let's KEEP the codec.
+         # since size good & codec good, keep video codec.
          cmd+="-vcodec copy "
       fi   
       tmp_filename=$filename`date +"%s"`".tmp.mp4"
@@ -108,7 +122,8 @@ echo "+++++++++++++++++++++++++++++++++++++++++++++"
 echo "Preparing video operations (have patience...)"
 for cmd in "${cmd_list[@]}"
 do
-    $cmd
+   echo "${cmd}"
+   $cmd
 done
 
 # deleting temp files
