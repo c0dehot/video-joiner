@@ -119,13 +119,26 @@ while [ $file_idx -le $total_files ]; do
    if [ "${#file_start_time}" -eq 0 ] && [ "${#file_end_time}" -eq 0 ] && [ $file_ext = "mp4" ] && [ $video_codec = "h264" ] && [ $output_resolution = $resolution ]; then
       echo "file ${filename}" >> $ffmpeg_file_list
    else
+
       cmd="ffmpeg -hide_banner -loglevel panic -stats "
       if [ "${#file_start_time}" -eq 8 ]; then
          cmd+="-ss ${file_start_time} "
       fi
       cmd+="-i ${filename} "
       if [ "${#file_end_time}" -eq 8 ]; then
-         cmd+="-to ${file_end_time} "
+         if [ "${#file_start_time}" -eq 0 ]; then
+            file_start_time="00:00:00"
+         fi
+         # the seek (-ss) before seeks to a point in file (fast), but screws up
+         # the -to end (by the -ss time), so we need to calculate the dif
+         _start=`echo $file_start_time | cut -d "|" -f 2`;
+         _end=`echo $file_end_time | cut -d "|" -f 3`;
+         _start_seconds=`echo $_start | sed 's/^/((/; s/:/)*60+/g' | bc`
+         _end_seconds=`echo $_end | sed 's/^/((/; s/:/)*60+/g' | bc`
+         file_duration=`expr ${_end_seconds} - ${_start_seconds}`
+         #cmd+="-to ${file_end_time} "
+         echo ".. file_duration: ${file_duration}"
+         cmd+="-t ${file_duration} "
       fi
 
       if [ $file_ext = "mp4" ] && [ $video_codec = "h264" ] && [ $output_resolution = $resolution ] && [ $output_fps = $fps ]; then
@@ -156,6 +169,7 @@ echo "+++++++++++++++++++++++++++++++++++++++++++++"
 echo "Preparing video operations (have patience...)"
 for cmd in "${cmd_list[@]}"
 do
+   echo " ... processing next video file... "
    $cmd
 done
 
